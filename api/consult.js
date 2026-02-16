@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     }
 
     // --- 2. Validate Request ---
-    const { query } = req.body || {}; // Added safety check for body
+    const { query } = req.body || {}; 
     if (!query) return res.status(400).json({ error: "Query is required" });
 
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
@@ -44,9 +44,16 @@ export default async function handler(req, res) {
                 console.log(`Backend attempting: ${model}`);
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
                 
+                // --- THE ROBUST PROMPT INJECTION ---
                 const systemPrompt = `
-You are The Archivist, a sophisticated and deeply knowledgeable literary expert. 
-Your task is to identify or recommend ONE specific book based on: "${query}"
+You are The Archivist, a sophisticated and deeply knowledgeable literary expert.
+
+Your goal is to recommend ONE specific book based on the user's input. You must analyze the nature of the input to decide your action:
+
+LOGIC MAP:
+1. If Input is a SYNOPSIS or DESCRIPTION -> Identify the specific book they are describing.
+2. If Input is a SPECIFIC QUOTE -> Identify the book that contains this quote.
+3. If Input is a VIBE, MOOD, or FEELING -> Recommend the single best matching literary work (novel, poetry, or non-fiction).
 
 INSTRUCTIONS FOR THE 'REASON' FIELD:
 - Use sophisticated, evocative, and "ink-and-paper" style language.
@@ -54,17 +61,14 @@ INSTRUCTIONS FOR THE 'REASON' FIELD:
 - Do not just summarize the plot; explain the atmospheric or thematic connection to the user's inquiry.
 - Maintain a mysterious yet helpful persona.
 
-RULES:
-1. IDENTIFY specific quotes/plots accurately.
-2. RECOMMEND vibes with deep literary insight.
-3. Output ONLY strict JSON.
-
-JSON STRUCTURE:
+Strictly Output JSON ONLY with this format:
 { 
     "title": "Exact Book Title", 
     "author": "Author Name", 
     "reason": "A sophisticated and evocative Archivist's note, precisely 25-40 words long."
 }
+
+User Input: "${query}"
 `;
 
                 const geminiResponse = await fetch(geminiUrl, {
@@ -135,7 +139,7 @@ JSON STRUCTURE:
             const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
             
             try {
-                // The HEAD check: Just asks "Does this exist?" without downloading the image
+                // The HEAD check
                 const checkResponse = await fetch(openLibraryUrl, { method: 'HEAD' });
                 
                 if (checkResponse.ok) {
@@ -150,8 +154,7 @@ JSON STRUCTURE:
             }
         }
 
-        // --- STEP D: Final Response (THIS WAS MISSING BEFORE) ---
-        // Without this, the frontend waits forever and then crashes.
+        // --- STEP D: Final Response ---
         res.status(200).json({
             gemini: bookData,
             google: { 
@@ -166,4 +169,3 @@ JSON STRUCTURE:
         res.status(500).json({ error: "Archivist error: " + error.message });
     }
 }
-
