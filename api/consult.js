@@ -132,40 +132,41 @@ User Input: "${query}"
             }
         }
 
-        // --- STEP C: The Open Library Rescue (Fallback) ---
-        if (!coverUrl && isbn) {
-            console.log(`Google failed cover. Trying Open Library for ISBN: ${isbn}`);
-            
-            const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
-            
-            try {
-                // The HEAD check
-                const checkResponse = await fetch(openLibraryUrl, { method: 'HEAD' });
+       // --- STEP C: The Open Library Rescue (The "Fuzzy" Fallback) ---
+        if (!coverUrl) {
+            console.log("Google failed cover. Initiating Open Library Rescue...");
+
+            // Sub-Strategy 1: Try ISBN Direct (Fastest)
+            if (isbn) {
+                const isbnUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
+                try {
+                    const check = await fetch(isbnUrl, { method: 'HEAD' });
+                    if (check.ok) coverUrl = isbnUrl;
+                } catch (e) { console.warn("OL ISBN check failed"); }
+            }
+
+            // Sub-Strategy 2: The "Fuzzy" Search (Smartest)
+            // If ISBN failed or didn't exist, we search OL for the Title+Author manually
+            if (!coverUrl) {
+                console.log(`ISBN failed. Searching Open Library for: ${cleanTitle} by ${cleanAuthor}`);
                 
-                if (checkResponse.ok) {
-                    coverUrl = openLibraryUrl; 
-                } else {
-                    console.log("Open Library returned 404. No cover found.");
-                    coverUrl = null; 
+                // We ask Open Library's search API for the first book matching this title/author
+                const searchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(cleanTitle)}&author=${encodeURIComponent(cleanAuthor)}&limit=1`;
+                
+                try {
+                    const searchRes = await fetch(searchUrl);
+                    const searchData = await searchRes.json();
+                    
+                    // If we found a book record with a cover ID...
+                    if (searchData.docs && searchData.docs.length > 0) {
+                        const doc = searchData.docs[0];
+                        if (doc.cover_i) {
+                            coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+                            console.log("Found cover via Fuzzy Search!");
+                        }
+                    }
+                } catch (e) {
+                    console.warn("OL Fuzzy Search failed:", e.message);
                 }
-            } catch (err) {
-                console.warn("Open Library check failed:", err.message);
-                coverUrl = null;
             }
         }
-
-        // --- STEP D: Final Response ---
-        res.status(200).json({
-            gemini: bookData,
-            google: { 
-                coverUrl: coverUrl, 
-                rating: rating, 
-                count: count 
-            }
-        });
-
-    } catch (error) {
-        console.error("Server Critical Error:", error);
-        res.status(500).json({ error: "Archivist error: " + error.message });
-    }
-}
