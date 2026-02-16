@@ -103,13 +103,33 @@ JSON STRUCTURE:
         let coverUrl = null;
         let rating = null;
         let count = 0;
+        let isbn = null;
 
         if (booksData.items && booksData.items.length > 0) {
             const info = booksData.items[0].volumeInfo;
-            // Use High Res if available, otherwise thumbnail
-            coverUrl = info.imageLinks?.thumbnail?.replace('http:', 'https:') || null;
+            
+            // 1. Try to get Google's Cover
+            if (info.imageLinks?.thumbnail) {
+                coverUrl = info.imageLinks.thumbnail.replace('http:', 'https:');
+            }
+            
+            // 2. Grab other metadata
             rating = info.averageRating || null;
             count = info.ratingsCount || 0;
+
+            // 3. Grab ISBN for the fallback (Check industryIdentifiers)
+            if (info.industryIdentifiers) {
+                const isbnObj = info.industryIdentifiers.find(id => id.type === "ISBN_13") || info.industryIdentifiers[0];
+                if (isbnObj) isbn = isbnObj.identifier;
+            }
+        }
+
+        // --- STEP C: The Open Library Rescue (Fallback) ---
+        // If Google failed to give us a cover, but we have an ISBN, ask Open Library.
+        if (!coverUrl && isbn) {
+            console.log(`Google failed cover. Trying Open Library for ISBN: ${isbn}`);
+            // Size 'L' gives a nice large image.
+            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
         }
 
         res.status(200).json({
@@ -122,4 +142,5 @@ JSON STRUCTURE:
         res.status(500).json({ error: "Failed to fetch data: " + error.message });
     }
 }
+
 
