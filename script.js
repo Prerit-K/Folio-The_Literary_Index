@@ -60,37 +60,55 @@ async function handleConsultation() {
 }
 
 // --- UI Helpers ---
+/* --- script.js --- */
 
 function displayResult(geminiData, googleData) {
-    // Text
+    // ... (Text handling section stays the same) ...
+
     titleEl.textContent = geminiData.title;
     authorEl.textContent = geminiData.author;
     reasonEl.textContent = geminiData.reason;
     
-    // Rating
     if (googleData.rating) {
         ratingEl.textContent = `User Rating: ${googleData.rating}/5 (${googleData.count} votes)`;
     } else {
         ratingEl.textContent = "Unrated in catalogue";
     }
 
-    // Image Handling with Safety Fallback
+    // --- NEW IMAGE HANDLING LOGIC ---
+
+    // 1. Prepare the Fallback HTML (The "Typography Cover")
+    // We inject the specific book details so it looks like a design choice, not an error.
+    coverFallback.innerHTML = `
+        <div class="fallback-title">${geminiData.title}</div>
+        <div class="fallback-author">${geminiData.author}</div>
+    `;
+
+    // 2. Decide what to show
     if (googleData.coverUrl) {
-        // Try to get a larger image
+        // Try to get high-res, but PRE-LOAD it first
         const highRes = googleData.coverUrl.replace('&zoom=1', '&zoom=2'); 
         
-        coverImg.src = highRes;
-        coverImg.classList.remove("hidden");
-        coverFallback.classList.add("hidden");
+        // Create a temporary image in memory
+        const tempImg = new Image();
+        tempImg.src = highRes;
 
-        // SAFETY: If high-res fails to load, revert to fallback
-        coverImg.onerror = function() {
-            console.log("High-res cover failed, showing fallback.");
+        // If it loads successfully:
+        tempImg.onload = function() {
+            coverImg.src = highRes;
+            coverImg.classList.remove("hidden");
+            coverFallback.classList.add("hidden");
+        };
+
+        // If it fails (404 or broken link):
+        tempImg.onerror = function() {
+            console.log("Cover load failed, showing fallback.");
             coverImg.classList.add("hidden");
             coverFallback.classList.remove("hidden");
         };
 
     } else {
+        // No URL provided at all
         coverImg.classList.add("hidden");
         coverFallback.classList.remove("hidden");
     }
@@ -147,4 +165,5 @@ window.addEventListener("popstate", (event) => {
     if (!modalOverlay.classList.contains("hidden")) {
         closeModal(false); // Pass false so it doesn't try to go back twice
     }
+
 });
