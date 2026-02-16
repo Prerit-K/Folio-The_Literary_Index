@@ -128,27 +128,25 @@ JSON STRUCTURE:
         if (!coverUrl && isbn) {
             console.log(`Google failed cover. Trying Open Library for ISBN: ${isbn}`);
             
-            // CRITICAL: We add ?default=false so Open Library returns a 404 if missing,
-            // rather than a blank 1x1 pixel. This allows your CSS fallback to trigger.
-            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
+            const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
+            
+            // VERIFICATION FIX:
+            // Don't just assume the image exists. Ask Open Library quickly with a "HEAD" request.
+            try {
+                const checkResponse = await fetch(openLibraryUrl, { method: 'HEAD' });
+                
+                if (checkResponse.ok) {
+                    coverUrl = openLibraryUrl; // It exists! Use it.
+                } else {
+                    console.log("Open Library returned 404. No cover found.");
+                    coverUrl = null; // Clean failure.
+                }
+            } catch (err) {
+                console.warn("Open Library check failed:", err.message);
+                coverUrl = null;
+            }
         }
 
-        // Final response to the frontend
-        res.status(200).json({
-            gemini: bookData,
-            google: { 
-                coverUrl: coverUrl, 
-                rating: rating, 
-                count: count 
-            }
-        });
-
-    } catch (error) {
-        // This catches any crashes in the Gemini or Books logic
-        console.error("Server Critical Error:", error);
-        res.status(500).json({ error: "Archivist error: " + error.message });
-    }
-}
 
 
 
