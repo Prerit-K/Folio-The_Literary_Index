@@ -156,4 +156,6 @@ JSON STRUCTURE:
 
     } catch (error) {
         console.error("Server Critical Error:", error);
-        res.status(500).json({ error: "Archivist error: " + error.
+        res.status(500).json({ error: "Archivist error: " + error.message });
+    }
+}
