@@ -124,21 +124,29 @@ JSON STRUCTURE:
         }
 
         // --- STEP C: The Open Library Rescue (Fallback) ---
-        // If Google failed to give us a cover, but we have an ISBN, ask Open Library.
+        // If Google failed to provide a cover, we use the ISBN to ask Open Library.
         if (!coverUrl && isbn) {
             console.log(`Google failed cover. Trying Open Library for ISBN: ${isbn}`);
-            // Size 'L' gives a nice large image.
-            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+            
+            // CRITICAL: We add ?default=false so Open Library returns a 404 if missing,
+            // rather than a blank 1x1 pixel. This allows your CSS fallback to trigger.
+            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
         }
 
+        // Final response to the frontend
         res.status(200).json({
             gemini: bookData,
-            google: { coverUrl, rating, count }
+            google: { 
+                coverUrl: coverUrl, 
+                rating: rating, 
+                count: count 
+            }
         });
 
     } catch (error) {
+        // This catches any crashes in the Gemini or Books logic
         console.error("Server Critical Error:", error);
-        res.status(500).json({ error: "Failed to fetch data: " + error.message });
+        res.status(500).json({ error: "Archivist error: " + error.message });
     }
 }
 
