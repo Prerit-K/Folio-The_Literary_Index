@@ -305,33 +305,46 @@ button#consult-btn:disabled {
     transform: scale(1.03) rotate(-1deg);
 }
 
+/* --- style.css --- */
+
+/* Replace the old #cover-fallback with this new "Typography Cover" design */
 #cover-fallback {
     width: 100%;
     height: 100%;
-    background: linear-gradient(45deg, #2c2c2c, #4a4a4a); /* Sleek dark gradient */
+    background-color: var(--paper); /* Matches your theme */
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    color: #fdfbf7;
+    text-align: center;
+    padding: 20px;
+    
+    /* A vintage "double border" look */
+    border: 3px double var(--faded-ink); 
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+}
+
+/* We will inject these classes via JS below */
+.fallback-title {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    color: var(--ink);
+    margin-bottom: 10px;
+    line-height: 1.1;
+    font-style: italic;
+}
+
+.fallback-author {
     font-family: var(--font-mono);
-    border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--accent); /* Uses your Red Ink accent */
+    letter-spacing: 1px;
 }
 
-#cover-fallback::after {
-    content: "IMAGE PRESERVED IN PHYSICAL ARCHIVE";
-    font-size: 0.6rem;
-    letter-spacing: 2px;
-    opacity: 0.5;
-    margin-top: 10px;
-}
-
-#cover-fallback .spine {
-    position: absolute;
-    left: 10px; top: 0; bottom: 0; width: 4px;
-    background: rgba(0,0,0,0.2);
-}
+/* Remove the old "spine" and "after" content if you want a cleaner look */
+#cover-fallback::after { content: none; }
+#cover-fallback .spine { display: none; }
 
 .card-text {
     flex: 1.5;
@@ -430,4 +443,5 @@ button#consult-btn:disabled {
     .card-visual { min-height: 150px; }
     #book-cover { max-height: 180px; }
 }
+
 
