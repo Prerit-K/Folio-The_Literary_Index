@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
     const BOOKS_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 
-    // Smart Fallback List (Tries your preferred models first)
+    // Smart Fallback List
     const MODEL_PRIORITY = [
         "gemini-2.0-flash",       
         "gemini-2.5-flash",       
@@ -76,7 +76,6 @@ JSON STRUCTURE:
                 }
 
                 let rawText = geminiJson.candidates[0].content.parts[0].text;
-                // Clean up any markdown code blocks the AI might add
                 rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
                 bookData = JSON.parse(rawText);
                 
@@ -116,7 +115,7 @@ JSON STRUCTURE:
             rating = info.averageRating || null;
             count = info.ratingsCount || 0;
 
-            // 3. Grab ISBN for the fallback (Check industryIdentifiers)
+            // 3. Grab ISBN for the fallback
             if (info.industryIdentifiers) {
                 const isbnObj = info.industryIdentifiers.find(id => id.type === "ISBN_13") || info.industryIdentifiers[0];
                 if (isbnObj) isbn = isbnObj.identifier;
@@ -124,22 +123,20 @@ JSON STRUCTURE:
         }
 
         // --- STEP C: The Open Library Rescue (Fallback) ---
-        // If Google failed to provide a cover, we use the ISBN to ask Open Library.
         if (!coverUrl && isbn) {
             console.log(`Google failed cover. Trying Open Library for ISBN: ${isbn}`);
             
             const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
             
-            // VERIFICATION FIX:
-            // Don't just assume the image exists. Ask Open Library quickly with a "HEAD" request.
             try {
+                // The HEAD check: Just asks "Does this exist?" without downloading the image
                 const checkResponse = await fetch(openLibraryUrl, { method: 'HEAD' });
                 
                 if (checkResponse.ok) {
-                    coverUrl = openLibraryUrl; // It exists! Use it.
+                    coverUrl = openLibraryUrl; 
                 } else {
                     console.log("Open Library returned 404. No cover found.");
-                    coverUrl = null; // Clean failure.
+                    coverUrl = null; 
                 }
             } catch (err) {
                 console.warn("Open Library check failed:", err.message);
@@ -147,6 +144,16 @@ JSON STRUCTURE:
             }
         }
 
+        // --- STEP D: Final Response (THIS WAS MISSING) ---
+        res.status(200).json({
+            gemini: bookData,
+            google: { 
+                coverUrl: coverUrl, 
+                rating: rating, 
+                count: count 
+            }
+        });
 
-
-
+    } catch (error) {
+        console.error("Server Critical Error:", error);
+        res.status(500).json({ error: "Archivist error: " + error.
