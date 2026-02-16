@@ -9,7 +9,6 @@ export default async function handler(req, res) {
         'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
     );
 
-    // Handle Preflight Request
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -23,8 +22,8 @@ export default async function handler(req, res) {
     const BOOKS_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 
     if (!GEMINI_KEY || !BOOKS_KEY) {
-        console.error("Missing API Keys in Environment Variables");
-        return res.status(500).json({ error: "Server Configuration Error: Missing Keys" });
+        console.error("Missing API Keys");
+        return res.status(500).json({ error: "Server Configuration Error" });
     }
 
     const MODEL_PRIORITY = [
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
     ];
 
     try {
-        // --- STEP A: Ask Gemini (The "Brain") ---
+        // --- STEP A: Ask Gemini (The Archivist) ---
         let bookData = null;
         let lastError = null;
 
@@ -44,33 +43,28 @@ export default async function handler(req, res) {
                 console.log(`Backend attempting: ${model}`);
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
                 
-                // --- THE ROBUST PROMPT INJECTION ---
                 const systemPrompt = `
-You are The Archivist, a sophisticated and deeply knowledgeable literary expert.
-
-Your goal is to recommend ONE specific book based on the user's input. You must analyze the nature of the input to decide your action:
+You are The Archivist, a sophisticated literary expert.
+Your goal is to recommend ONE specific book based on the user's input. 
 
 LOGIC MAP:
-1. If Input is a SYNOPSIS or DESCRIPTION -> Identify the specific book they are describing.
-2. If Input is a SPECIFIC QUOTE -> Identify the book that contains this quote.
-3. If Input is a VIBE, MOOD, or FEELING -> Recommend the single best matching literary work (novel, poetry, or non-fiction).
+1. SYNOPSIS/DESCRIPTION -> Identify the book.
+2. SPECIFIC QUOTE -> Identify the book.
+3. VIBE/FEELING -> Recommend the best matching literary work.
 
-INSTRUCTIONS FOR THE 'REASON' FIELD:
-- Use sophisticated, evocative, and "ink-and-paper" style language.
-- Limit the length to between 25 and 40 words. 
-- Do not just summarize the plot; explain the atmospheric or thematic connection to the user's inquiry.
+INSTRUCTIONS:
+- Use sophisticated, evocative, "ink-and-paper" style language.
+- Reason length: 25-40 words. 
 - Maintain a mysterious yet helpful persona.
 
-Strictly Output JSON ONLY with this format:
+Output JSON ONLY:
 { 
     "title": "Exact Book Title", 
     "author": "Author Name", 
-    "reason": "A sophisticated and evocative Archivist's note, precisely 25-40 words long."
+    "reason": "Archivist's note."
 }
-
 User Input: "${query}"
 `;
-
                 const geminiResponse = await fetch(geminiUrl, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -78,29 +72,21 @@ User Input: "${query}"
                 });
 
                 if (!geminiResponse.ok) throw new Error(`Model ${model} returned ${geminiResponse.status}`);
-
                 const geminiJson = await geminiResponse.json();
                 
-                if (!geminiJson.candidates || !geminiJson.candidates[0]) {
-                    throw new Error(`Model ${model} returned empty candidates`);
-                }
-
                 let rawText = geminiJson.candidates[0].content.parts[0].text;
                 rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
                 bookData = JSON.parse(rawText);
-                
-                break; // It worked!
+                break; 
             } catch (e) {
                 console.warn(`Backend: ${model} failed:`, e.message);
                 lastError = e;
             }
         }
 
-        if (!bookData) {
-            throw new Error("All Archivist models failed. Last error: " + lastError?.message);
-        }
+        if (!bookData) throw new Error("All Archivist models failed.");
 
-        // --- STEP B: Ask Google Books (The "Library") ---
+        // --- STEP B: Ask Google Books (The Library) ---
         const cleanTitle = bookData.title.replace(/[^\w\s]/gi, '');
         const cleanAuthor = bookData.author.replace(/[^\w\s]/gi, '');
         const booksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanTitle + " " + cleanAuthor)}&maxResults=1&key=${BOOKS_KEY}`;
@@ -115,24 +101,18 @@ User Input: "${query}"
 
         if (booksData.items && booksData.items.length > 0) {
             const info = booksData.items[0].volumeInfo;
-            
-            // 1. Try to get Google's Cover
             if (info.imageLinks?.thumbnail) {
                 coverUrl = info.imageLinks.thumbnail.replace('http:', 'https:');
             }
-            
-            // 2. Grab other metadata
             rating = info.averageRating || null;
             count = info.ratingsCount || 0;
-
-            // 3. Grab ISBN for the fallback
             if (info.industryIdentifiers) {
                 const isbnObj = info.industryIdentifiers.find(id => id.type === "ISBN_13") || info.industryIdentifiers[0];
                 if (isbnObj) isbn = isbnObj.identifier;
             }
         }
 
-       // --- STEP C: The Open Library Rescue (The "Fuzzy" Fallback) ---
+        // --- STEP C: The Open Library Rescue (The "Fuzzy" Fallback) ---
         if (!coverUrl) {
             console.log("Google failed cover. Initiating Open Library Rescue...");
 
@@ -149,15 +129,12 @@ User Input: "${query}"
             // If ISBN failed or didn't exist, we search OL for the Title+Author manually
             if (!coverUrl) {
                 console.log(`ISBN failed. Searching Open Library for: ${cleanTitle} by ${cleanAuthor}`);
-                
-                // We ask Open Library's search API for the first book matching this title/author
                 const searchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(cleanTitle)}&author=${encodeURIComponent(cleanAuthor)}&limit=1`;
                 
                 try {
                     const searchRes = await fetch(searchUrl);
                     const searchData = await searchRes.json();
                     
-                    // If we found a book record with a cover ID...
                     if (searchData.docs && searchData.docs.length > 0) {
                         const doc = searchData.docs[0];
                         if (doc.cover_i) {
@@ -170,3 +147,19 @@ User Input: "${query}"
                 }
             }
         }
+
+        // --- STEP D: Final Response ---
+        res.status(200).json({
+            gemini: bookData,
+            google: { 
+                coverUrl: coverUrl, 
+                rating: rating, 
+                count: count 
+            }
+        });
+
+    } catch (error) {
+        console.error("Server Critical Error:", error);
+        res.status(500).json({ error: "Archivist error: " + error.message });
+    }
+}
