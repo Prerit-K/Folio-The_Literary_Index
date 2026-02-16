@@ -1,6 +1,6 @@
 // api/consult.js
 export default async function handler(req, res) {
-    // 1. Setup Headers (Allow your site to talk to this function)
+    // 1. Setup Headers (CORS)
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -9,43 +9,75 @@ export default async function handler(req, res) {
         'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
     );
 
-    // Handle Preflight (Browser checking if it's safe)
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
     }
 
-    // 2. Get the user query
     const { query } = req.body;
-    if (!query) {
-        return res.status(400).json({ error: "Query is required" });
-    }
+    if (!query) return res.status(400).json({ error: "Query is required" });
 
-    // 3. Get Keys from Environment (Securely)
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
     const BOOKS_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 
+    // --- RESTORED: The Priority List from your original code ---
+    const MODEL_PRIORITY = [
+        "gemini-2.5-flash",       
+        "gemini-2.5-flash-lite",  
+        "gemini-2.0-flash",       
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash" // Added as a final safety net
+    ];
+
     try {
-        // --- STEP A: Ask Gemini ---
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
-        
-        const systemPrompt = `
-        You are an expert literary archivist. Recommend ONE specific book based on: "${query}".
-        Strictly Output JSON ONLY:
-        { "title": "Exact Title", "author": "Author Name", "reason": "A single evocative sentence." }
-        `;
+        // --- STEP A: Ask Gemini (With Loop/Fallback) ---
+        let bookData = null;
+        let lastError = null;
 
-        const geminiResponse = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
-        });
+        for (const model of MODEL_PRIORITY) {
+            try {
+                console.log(`Backend attempting: ${model}`); // Logs to Vercel console
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+                
+                const systemPrompt = `
+                You are an expert literary archivist. Recommend ONE specific book based on: "${query}".
+                Strictly Output JSON ONLY:
+                { "title": "Exact Title", "author": "Author Name", "reason": "A single evocative sentence." }
+                `;
 
-        const geminiData = await geminiResponse.json();
-        let rawText = geminiData.candidates[0].content.parts[0].text;
-        // Clean up markdown if Gemini adds it
-        rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-        const bookData = JSON.parse(rawText);
+                const geminiResponse = await fetch(geminiUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+                });
+
+                if (!geminiResponse.ok) {
+                    throw new Error(`Model ${model} returned ${geminiResponse.status}`);
+                }
+
+                const geminiJson = await geminiResponse.json();
+                
+                // Safety Check: Did we actually get an answer?
+                if (!geminiJson.candidates || !geminiJson.candidates[0]) {
+                    throw new Error(`Model ${model} returned empty candidates`);
+                }
+
+                let rawText = geminiJson.candidates[0].content.parts[0].text;
+                rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+                bookData = JSON.parse(rawText);
+                
+                // If we get here, it worked! Break the loop.
+                break; 
+            } catch (e) {
+                console.warn(`Backend: ${model} failed:`, e.message);
+                lastError = e;
+                // Loop continues to next model...
+            }
+        }
+
+        if (!bookData) {
+            throw new Error("All Archivist models failed. Last error: " + lastError?.message);
+        }
 
         // --- STEP B: Ask Google Books ---
         const cleanTitle = bookData.title.replace(/[^\w\s]/gi, '');
@@ -66,14 +98,13 @@ export default async function handler(req, res) {
             count = info.ratingsCount || 0;
         }
 
-        // --- STEP C: Send Combined Result back to Frontend ---
         res.status(200).json({
             gemini: bookData,
             google: { coverUrl, rating, count }
         });
 
     } catch (error) {
-        console.error("Server Error:", error);
-        res.status(500).json({ error: "Failed to fetch data" });
+        console.error("Server Critical Error:", error);
+        res.status(500).json({ error: "Failed to fetch data: " + error.message });
     }
 }
