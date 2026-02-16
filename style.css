@@ -306,17 +306,25 @@ button#consult-btn:disabled {
 }
 
 #cover-fallback {
-    width: 160px;
-    height: 240px;
-    background-color: #5d4037;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, #2c2c2c, #4a4a4a); /* Sleek dark gradient */
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    color: rgba(255,255,255,0.3);
+    color: #fdfbf7;
     font-family: var(--font-mono);
-    border-radius: 2px;
-    box-shadow: inset 3px 0 10px rgba(0,0,0,0.5);
-    position: relative;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+}
+
+#cover-fallback::after {
+    content: "IMAGE PRESERVED IN PHYSICAL ARCHIVE";
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    opacity: 0.5;
+    margin-top: 10px;
 }
 
 #cover-fallback .spine {
@@ -422,3 +430,4 @@ button#consult-btn:disabled {
     .card-visual { min-height: 150px; }
     #book-cover { max-height: 180px; }
 }
+
