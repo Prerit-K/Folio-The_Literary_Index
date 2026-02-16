@@ -1,6 +1,6 @@
 // api/consult.js
 export default async function handler(req, res) {
-    // 1. Setup Headers (CORS)
+    // --- 1. Setup Headers (CORS) ---
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -9,18 +9,24 @@ export default async function handler(req, res) {
         'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
     );
 
+    // Handle Preflight Request
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
     }
 
-    const { query } = req.body;
+    // --- 2. Validate Request ---
+    const { query } = req.body || {}; // Added safety check for body
     if (!query) return res.status(400).json({ error: "Query is required" });
 
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
     const BOOKS_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 
-    // Smart Fallback List
+    if (!GEMINI_KEY || !BOOKS_KEY) {
+        console.error("Missing API Keys in Environment Variables");
+        return res.status(500).json({ error: "Server Configuration Error: Missing Keys" });
+    }
+
     const MODEL_PRIORITY = [
         "gemini-2.0-flash",       
         "gemini-2.5-flash",       
@@ -144,7 +150,8 @@ JSON STRUCTURE:
             }
         }
 
-        // --- STEP D: Final Response (THIS WAS MISSING) ---
+        // --- STEP D: Final Response (THIS WAS MISSING BEFORE) ---
+        // Without this, the frontend waits forever and then crashes.
         res.status(200).json({
             gemini: bookData,
             google: { 
