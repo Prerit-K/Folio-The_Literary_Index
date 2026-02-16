@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FDFBF7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="assets/favicon.png">
+    <title>FOLIO | The Literary Index</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <main class="container">
+        <header>
+            <h1 class="logo">FOLIO</h1>
+            <p class="subtitle">The Literary Index</p>
+        </header>
+
+        <section class="input-area">
+            <div class="entry-slip">
+    <label for="query">Subject / Inquiry / Mood</label>
+    
+    <div class="input-wrapper">
+        <textarea id="query" placeholder="Describe a plot, quote, or feeling..."></textarea>
+    </div>
+    
+    <div class="stamp-area">
+                    <button id="consult-btn">CONSULT</button>
+                </div>
+            </div>
+        </section>
+
+        <div id="loader" class="hidden">
+            <span class="typing-text">Accessing Archives...</span>
+        </div>
+    </main>
+
+    <div id="modal-overlay" class="hidden">
+        <div class="index-card">
+            <button id="close-btn">&times;</button>
+            
+            <div class="card-content">
+                <div class="card-visual">
+                    <div id="book-cover-container">
+                        <img id="book-cover" src="" alt="Book Cover" class="hidden">
+                        <div id="cover-fallback" class="hidden">
+                            <div class="spine"></div>
+                            <span>NO IMAGE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-text">
+                    <div class="meta-header">
+                        <h2 id="book-title">Title</h2>
+                        <h3 id="book-author">Author</h3>
+                        <div class="rating-display" id="book-rating"></div>
+                    </div>
+                    <hr class="separator">
+                    <div class="archivist-note">
+                        <span class="label">ARCHIVIST'S NOTE:</span>
+                        <p id="book-reason">...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

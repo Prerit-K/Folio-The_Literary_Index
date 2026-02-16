@@ -1,0 +1,424 @@
+/* --- Variables & Reset --- */
+:root {
+    --paper: #FDFBF7;
+    --ink: #2C2C2C;
+    --faded-ink: #555555;
+    --accent: #8B0000; /* Deep Ink Red */
+    --font-serif: 'Cormorant Garamond', serif;
+    --font-mono: 'Courier Prime', monospace;
+    
+    /* Animation Physics - The "Premium" Feel */
+    --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring */
+    --ease-smooth: cubic-bezier(0.4, 0.0, 0.2, 1);      /* Modern standard */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-serif);
+    
+    /* FIX: Use dvh for mobile browsers to account for URL bar */
+    height: 100vh;
+    height: 100dvh; 
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    overflow: hidden;
+    
+    /* FIX: Prevents pull-to-refresh on mobile which ruins the app feel */
+    overscroll-behavior: none; 
+}
+
+/* --- Main Layout --- */
+.container {
+    text-align: center;
+    width: 90%;
+    max-width: 600px;
+    z-index: 1;
+    /* Smooth fade in for the whole app */
+    animation: fadeIn 1s var(--ease-smooth);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.logo {
+    font-size: 4rem;
+    letter-spacing: 0.2em;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    text-transform: uppercase;
+    cursor: default;
+    transition: transform 0.5s var(--ease-out-back);
+}
+
+.logo:hover {
+    transform: scale(1.02); /* Subtle breathing effect */
+}
+
+.subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+    color: var(--faded-ink);
+    margin-bottom: 3rem;
+    text-transform: uppercase;
+}
+
+/* --- Entry Slip (Input) - The "Samsung/Reddit" Smoothness --- */
+.entry-slip {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    position: relative; /* Needed for the underline animation */
+}
+
+label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--faded-ink);
+    transition: color 0.3s ease;
+}
+
+/* The Input Container */
+.input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    /* We remove the default border to draw our own animated one */
+    border-bottom: 1px solid rgba(44, 44, 44, 0.2); 
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-style: italic;
+    resize: none;
+    height: 80px;
+    outline: none;
+    padding: 10px 0;
+    line-height: 1.4;
+    caret-color: var(--accent); /* The blinking cursor is now Red Ink */
+    transition: all 0.3s ease;
+}
+
+textarea::placeholder {
+    color: #ccc;
+    font-style: normal;
+    transition: opacity 0.3s ease;
+}
+
+textarea:focus::placeholder {
+    opacity: 0.5; /* Fade out placeholder when typing */
+}
+
+/* The Animated Underline (Magic Line) */
+.input-wrapper::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0%;
+    height: 2px;
+    background-color: var(--ink);
+    transition: width 0.4s var(--ease-smooth); /* Smooth expansion */
+    margin: 0 auto;
+    right: 0;
+}
+
+/* When clicking/typing */
+.input-wrapper:focus-within::after {
+    width: 100%; /* Line draws full width */
+}
+
+.entry-slip:focus-within label {
+    color: var(--accent); /* Label turns red when typing */
+}
+
+/* --- Button (Ink Stamp Style) --- */
+.stamp-area {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+button#consult-btn {
+    background: transparent;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    padding: 12px 24px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    position: relative;
+    overflow: hidden;
+    
+    /* Smooth transitions for everything */
+    transition: all 0.3s var(--ease-smooth); 
+}
+
+/* Hover: The "Ink Fill" */
+button#consult-btn:hover {
+    background: var(--ink);
+    color: var(--paper);
+    transform: translateY(-2px) rotate(-1deg); /* Lifts up slightly */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* Casts a shadow */
+}
+
+/* Active: The "Press" (Click) */
+button#consult-btn:active {
+    transform: scale(0.95) rotate(0deg); /* Physical press down */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Disabled State (Loading) */
+button#consult-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+    transform: none;
+}
+
+/* --- Loader --- */
+#loader {
+    margin-top: 2rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    height: 20px;
+    opacity: 0.7;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* --- Modal (Index Card) Animations --- */
+#modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(44, 44, 44, 0.4); 
+    backdrop-filter: blur(4px); /* Modern frosted glass blur */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    
+    /* Fade in overlay */
+    animation: fadeOverlay 0.4s ease forwards;
+}
+
+@keyframes fadeOverlay {
+    from { opacity: 0; backdrop-filter: blur(0px); }
+    to { opacity: 1; backdrop-filter: blur(4px); }
+}
+
+.index-card {
+    background-color: var(--paper);
+    width: 90%;
+    max-width: 800px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2), 0 5px 15px rgba(0,0,0,0.1); 
+    padding: 40px;
+    position: relative;
+    border-radius: 2px;
+    
+    /* The "Spring" Entrance Animation */
+    animation: springUp 0.6s var(--ease-out-back) forwards;
+    transform-origin: center center;
+}
+
+/* This makes it pop like a notification card */
+@keyframes springUp {
+    0% { 
+        transform: translateY(40px) scale(0.95); 
+        opacity: 0; 
+    }
+    100% { 
+        transform: translateY(0) scale(1); 
+        opacity: 1; 
+    }
+}
+
+#close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--faded-ink);
+    font-family: var(--font-serif);
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+#close-btn:hover {
+    color: var(--accent);
+    transform: rotate(90deg); /* Playful spin on hover */
+}
+
+/* Content Layout (Same as before) */
+.card-content {
+    display: flex;
+    gap: 40px;
+}
+
+.card-visual {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f4f1ea;
+    padding: 20px;
+    min-height: 300px;
+    
+    /* Subtle fade in for image */
+    opacity: 0;
+    animation: fadeIn 0.8s ease 0.3s forwards; /* Delayed slightly */
+}
+
+#book-cover {
+    max-width: 100%;
+    max-height: 350px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+    transition: transform 0.3s var(--ease-out-back);
+}
+
+#book-cover:hover {
+    transform: scale(1.03) rotate(-1deg);
+}
+
+#cover-fallback {
+    width: 160px;
+    height: 240px;
+    background-color: #5d4037;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: rgba(255,255,255,0.3);
+    font-family: var(--font-mono);
+    border-radius: 2px;
+    box-shadow: inset 3px 0 10px rgba(0,0,0,0.5);
+    position: relative;
+}
+
+#cover-fallback .spine {
+    position: absolute;
+    left: 10px; top: 0; bottom: 0; width: 4px;
+    background: rgba(0,0,0,0.2);
+}
+
+.card-text {
+    flex: 1.5;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    
+    /* Staggered text entrance */
+    opacity: 0;
+    animation: fadeIn 0.8s ease 0.4s forwards;
+}
+
+.meta-header h2 {
+    font-size: 2.5rem;
+    line-height: 1.1;
+    margin-bottom: 0.5rem;
+}
+
+.meta-header h3 {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    text-transform: uppercase;
+    color: var(--faded-ink);
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+}
+
+.separator {
+    border: 0;
+    border-top: 1px dashed var(--ink);
+    margin: 20px 0;
+    opacity: 0.3;
+}
+
+.archivist-note .label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 10px;
+}
+
+.archivist-note p {
+    font-size: 1.2rem;
+    line-height: 1.6;
+}
+
+.rating-display {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--faded-ink);
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+    .card-content { flex-direction: column; }
+    .card-visual { min-height: 200px; padding: 10px; }
+    #book-cover { max-height: 200px; }
+    .meta-header h2 { font-size: 2rem; }
+}
+
+/* --- Mobile Optimization --- */
+
+/* Prevent hover effects from getting "stuck" on touch devices */
+@media (hover: hover) {
+    .logo:hover { transform: scale(1.02); }
+    button#consult-btn:hover {
+        background: var(--ink);
+        color: var(--paper);
+        transform: translateY(-2px) rotate(-1deg);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+}
+
+/* Specific Mobile Tweaks */
+@media (max-width: 768px) {
+    /* Make input text 16px to stop iOS from zooming in automatically */
+    textarea { font-size: 16px; } 
+
+    /* Make the card take up more screen real estate */
+    .index-card {
+        width: 95%;
+        padding: 25px;
+        max-height: 85dvh; /* Allow scrolling inside card if needed */
+        overflow-y: auto;
+    }
+
+    .card-content {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    /* Hide the visual/book cover on very small screens to focus on text? 
+       Optional, but here we just make it smaller */
+    .card-visual { min-height: 150px; }
+    #book-cover { max-height: 180px; }
+}
