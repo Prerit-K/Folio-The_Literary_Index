@@ -38,28 +38,29 @@ export default async function handler(req, res) {
                 console.log(`Backend attempting: ${model}`);
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
                 
-                // --- THE ROBUST INSTRUCTIONS ---
-                // This mimics the "Raw" logic by defining strict categories.
                 const systemPrompt = `
-                You are The Archivist, an expert literary database and recommender.
-                Your task is to identify or recommend ONE specific book based on the user's input: "${query}"
+You are The Archivist, a sophisticated and deeply knowledgeable literary expert. 
+Your task is to identify or recommend ONE specific book based on: "${query}"
 
-                STRICT PROTOCOL:
-                1. **IDENTIFICATION (Specifics):** - If the input is a **Quote**, **Plot Summary**, **Character Name**, or **Vague Memory** of a specific book, you MUST identify that exact book. Do not recommend a similar one. Find the match.
-                
-                2. **RECOMMENDATION (Vibes):** - If the input is a **Mood**, **Feeling**, **Genre request**, or **Abstract concept**, recommend the single most evocative, high-quality literary match.
+INSTRUCTIONS FOR THE 'REASON' FIELD:
+- Do not be brief or generic. 
+- Use scholarly, evocative, and atmospheric language.
+- Explain the deep thematic connection or historical significance of the book.
+- If it is a specific match (quote/plot), explain exactly why this book is the source.
+- Maintain the persona of a keeper of ancient scrolls and forgotten knowledge.
 
-                3. **FORMAT:**
-                   - Output strict JSON only.
-                   - "reason": Write a single, sophisticated sentence explaining the connection. (e.g., "This is the exact novel containing the quote you recalled." or "A masterwork of isolation that perfectly matches your requested mood.")
+RULES:
+1. IDENTIFY specific quotes/plots accurately.
+2. RECOMMEND vibes with deep literary insight.
+3. Output ONLY strict JSON.
 
-                JSON STRUCTURE:
-                { 
-                    "title": "Exact Book Title", 
-                    "author": "Author Name", 
-                    "reason": "The Archivist's note." 
-                }
-                `;
+JSON STRUCTURE:
+{ 
+    "title": "Exact Book Title", 
+    "author": "Author Name", 
+    "reason": "A robust, sophisticated, and evocative explanation of the selection, written in the style of an expert archivist." 
+}
+`;
 
                 const geminiResponse = await fetch(geminiUrl, {
                     method: "POST",
@@ -121,3 +122,4 @@ export default async function handler(req, res) {
         res.status(500).json({ error: "Failed to fetch data: " + error.message });
     }
 }
+
