@@ -16,56 +16,57 @@ export default async function handler(req, res) {
     }
 
     // --- 2. Validate Request ---
-    const { query } = req.body || {}; 
+    const { query } = req.body || {}; // Added safety check for body
     if (!query) return res.status(400).json({ error: "Query is required" });
 
     const GEMINI_KEY = process.env.GEMINI_API_KEY;
     const BOOKS_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 
     if (!GEMINI_KEY || !BOOKS_KEY) {
-        console.error("Missing API Keys");
-        return res.status(500).json({ error: "Server Config Error" });
+        console.error("Missing API Keys in Environment Variables");
+        return res.status(500).json({ error: "Server Configuration Error: Missing Keys" });
     }
 
-    // RESTORED: Your original priority list (2.5-flash first)
     const MODEL_PRIORITY = [
-        "gemini-2.5-flash",       // Best balance of speed & smarts
-        "gemini-2.5-flash-lite",  // Backup 1
-        "gemini-2.0-flash",       // Backup 2
-        "gemini-2.0-flash-lite"   // Ultimate fallback
+        "gemini-2.0-flash",       
+        "gemini-2.5-flash",       
+        "gemini-2.5-flash-lite",  
+        "gemini-1.5-flash"
     ];
 
     try {
-        // --- STEP A: Ask The Archivist (Gemini) ---
+        // --- STEP A: Ask Gemini (The "Brain") ---
         let bookData = null;
         let lastError = null;
 
-        // RESTORED: The EXACT System Prompt from your script.js
-        // This ensures the "Filtering" (Synopsis vs Quote vs Vibe) works exactly like before.
-        const systemPrompt = `
-        You are an expert literary archivist.
-        Your goal is to recommend ONE specific book based on the user's input.
-        
-        Input can be:
-        1. A synopsis/description -> Identify the book.
-        2. A specific quote -> Identify the book.
-        3. A vibe/feeling -> Recommend the best matching literary work (novel, poetry, or non-fiction).
-        
-        Strictly Output JSON ONLY with this format:
-        {
-          "title": "Exact Title",
-          "author": "Author Name",
-          "reason": "A single, evocative sentence explaining why this fits the user's request."
-        }
-        
-        User Input: "${query}"
-        `;
-
-        // Iterate through models (The Fallback Logic)
         for (const model of MODEL_PRIORITY) {
             try {
+                console.log(`Backend attempting: ${model}`);
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
                 
+                const systemPrompt = `
+You are The Archivist, a sophisticated and deeply knowledgeable literary expert. 
+Your task is to identify or recommend ONE specific book based on: "${query}"
+
+INSTRUCTIONS FOR THE 'REASON' FIELD:
+- Use sophisticated, evocative, and "ink-and-paper" style language.
+- Limit the length to between 25 and 40 words. 
+- Do not just summarize the plot; explain the atmospheric or thematic connection to the user's inquiry.
+- Maintain a mysterious yet helpful persona.
+
+RULES:
+1. IDENTIFY specific quotes/plots accurately.
+2. RECOMMEND vibes with deep literary insight.
+3. Output ONLY strict JSON.
+
+JSON STRUCTURE:
+{ 
+    "title": "Exact Book Title", 
+    "author": "Author Name", 
+    "reason": "A sophisticated and evocative Archivist's note, precisely 25-40 words long."
+}
+`;
+
                 const geminiResponse = await fetch(geminiUrl, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -81,11 +82,10 @@ export default async function handler(req, res) {
                 }
 
                 let rawText = geminiJson.candidates[0].content.parts[0].text;
-                // CLEANUP: Remove markdown formatting to prevent JSON parse errors
                 rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
                 bookData = JSON.parse(rawText);
                 
-                break; // Success! Exit loop.
+                break; // It worked!
             } catch (e) {
                 console.warn(`Backend: ${model} failed:`, e.message);
                 lastError = e;
@@ -96,14 +96,10 @@ export default async function handler(req, res) {
             throw new Error("All Archivist models failed. Last error: " + lastError?.message);
         }
 
-        // --- STEP B: Ask The Clerk (Google Books) ---
-        // RESTORED: The "Clean" logic from script.js
+        // --- STEP B: Ask Google Books (The "Library") ---
         const cleanTitle = bookData.title.replace(/[^\w\s]/gi, '');
         const cleanAuthor = bookData.author.replace(/[^\w\s]/gi, '');
-        
-        // RESTORED: The "Broad Search" logic
-        const q = `${cleanTitle} ${cleanAuthor}`;
-        const booksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=1&key=${BOOKS_KEY}`;
+        const booksUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanTitle + " " + cleanAuthor)}&maxResults=1&key=${BOOKS_KEY}`;
         
         const booksResponse = await fetch(booksUrl);
         const booksData = await booksResponse.json();
@@ -111,54 +107,58 @@ export default async function handler(req, res) {
         let coverUrl = null;
         let rating = null;
         let count = 0;
-        let isbn = null; // For backup
+        let isbn = null;
 
         if (booksData.items && booksData.items.length > 0) {
             const info = booksData.items[0].volumeInfo;
             
-            // 1. Image Logic
+            // 1. Try to get Google's Cover
             if (info.imageLinks?.thumbnail) {
-                // FIXED: Replicate the 'High Res' logic you had in script.js
-                // Original script: replaced 'http' with 'https' AND 'zoom=1' with 'zoom=2'
-                let rawThumb = info.imageLinks.thumbnail;
-                rawThumb = rawThumb.replace('http:', 'https:');
-                
-                // We attempt to upgrade to zoom=2 (High Res) here on the server
-                // so the frontend receives the best link immediately.
-                coverUrl = rawThumb.replace('&zoom=1', '&zoom=2'); 
+                coverUrl = info.imageLinks.thumbnail.replace('http:', 'https:');
             }
             
-            // 2. Metadata
+            // 2. Grab other metadata
             rating = info.averageRating || null;
             count = info.ratingsCount || 0;
 
-            // 3. Grab ISBN (For the Open Library backup)
+            // 3. Grab ISBN for the fallback
             if (info.industryIdentifiers) {
                 const isbnObj = info.industryIdentifiers.find(id => id.type === "ISBN_13") || info.industryIdentifiers[0];
                 if (isbnObj) isbn = isbnObj.identifier;
             }
         }
 
-        // --- STEP C: Open Library Rescue (Optional Backup) ---
-        // I kept this because it makes your app better, but it only runs if Google fails.
+        // --- STEP C: The Open Library Rescue (Fallback) ---
         if (!coverUrl && isbn) {
+            console.log(`Google failed cover. Trying Open Library for ISBN: ${isbn}`);
+            
             const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
+            
             try {
+                // The HEAD check: Just asks "Does this exist?" without downloading the image
                 const checkResponse = await fetch(openLibraryUrl, { method: 'HEAD' });
-                if (checkResponse.ok) coverUrl = openLibraryUrl; 
+                
+                if (checkResponse.ok) {
+                    coverUrl = openLibraryUrl; 
+                } else {
+                    console.log("Open Library returned 404. No cover found.");
+                    coverUrl = null; 
+                }
             } catch (err) {
-                console.warn("Open Library check failed");
+                console.warn("Open Library check failed:", err.message);
+                coverUrl = null;
             }
         }
 
-        // --- STEP D: Return Unified Response ---
+        // --- STEP D: Final Response (THIS WAS MISSING BEFORE) ---
+        // Without this, the frontend waits forever and then crashes.
         res.status(200).json({
-            title: bookData.title,
-            author: bookData.author,
-            reason: bookData.reason,
-            coverUrl: coverUrl,
-            rating: rating,
-            count: count
+            gemini: bookData,
+            google: { 
+                coverUrl: coverUrl, 
+                rating: rating, 
+                count: count 
+            }
         });
 
     } catch (error) {
@@ -166,3 +166,4 @@ export default async function handler(req, res) {
         res.status(500).json({ error: "Archivist error: " + error.message });
     }
 }
+
